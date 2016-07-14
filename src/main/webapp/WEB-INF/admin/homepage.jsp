@@ -185,7 +185,7 @@
                             value: data[2],
                             allowBlank: false,
                             blankText: '此项不能为空',
-                            emptyText: '请填写banner的链接地址,多个地址间用分号相隔如: http://www.hmlzs.org/xxx/banner-1.jpg;'
+                            emptyText: '请填写banner的链接地址,多个地址间用分号相隔如: http://www.hmlzs.cn/xxx/banner-1.jpg;'
                         }
                     ],
                     buttons: [
