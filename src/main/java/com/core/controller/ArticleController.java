@@ -39,7 +39,6 @@ public class ArticleController extends BaseController {
     @AsRight(id = 1, depict = "文章列表页面访问")
     @RequestMapping("/articleList")
     public String showPageNR(String treeId) {
-
         request.setAttribute("treeId", treeId);
         request.setAttribute("initData", articleService.getInitData());
         return getView("article");
@@ -49,7 +48,6 @@ public class ArticleController extends BaseController {
     @ResponseBody
     @RequestMapping(value = "/article/list", method = RequestMethod.POST, produces = "application/json;charset=UTF-8")
     public String listNR(String treeId, int pageSize, int page) {
-
         return articleService.pageList(treeId, pageSize, page).toString();
     }
 
@@ -101,10 +99,21 @@ public class ArticleController extends BaseController {
         return articleService.deleteArticle(data).toString();
     }
 
-    @AsRight(id = 9, depict = "文章静态化")
+    /*@AsRight(id = 9, depict = "文章静态化")
     @ResponseBody
     @RequestMapping("/article/staticize")
     public String staticizeNR(String data) {
+        String result = articleService.updateStaticize(data).toString();
+        articleIndexService.updateStaticize(data, articleService);
+
+        return result;
+    }*/
+    @AsRight(id = 9, depict = "启用并发布文章静态化")
+    @ResponseBody
+    @RequestMapping("/article/staticize")
+    public String staticizeNR(String data) {
+        // 启用
+        articleService.updateAcceptArticle(data).toString();
         String result = articleService.updateStaticize(data).toString();
         articleIndexService.updateStaticize(data, articleService);
 

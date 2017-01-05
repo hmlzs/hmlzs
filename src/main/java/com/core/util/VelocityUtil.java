@@ -18,13 +18,25 @@ public class VelocityUtil {
         return System.getProperty("webapp.root");
     }
 
-    public static String getTargetFile(String categoryName, long articleSerial) {
+    public static String getTargetFile(String categoryName, long articleSerial,String pagenum) {
         String path = getWebRootPath() + Constant.VELOCITY_TEMPLATE_OUT_PATH + File.separator + categoryName + File.separator + getThisYear() + File.separator;
         File file = new File(path);
         if (!file.exists()) {
             file.mkdirs();
         }
-        return path + articleSerial + ".html";
+        return path + articleSerial + pagenum + ".html";
+    }
+
+    public static String getTargetUrl(Config config, String categoryName, long articleSerial, String pagenum) {
+
+        String host = config.getDomain();
+        Pattern pattern = Pattern.compile("^http://");
+        Matcher matcher = pattern.matcher(host);
+        if (!matcher.find()) {
+            host = "http://" + host;
+        }
+
+        return host + "/"+ categoryName + "/" + getThisYear() + "/" + articleSerial + pagenum +".html";
     }
 
     public static String getTargetUrl(Config config, String categoryName, long articleSerial) {

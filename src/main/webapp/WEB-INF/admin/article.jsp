@@ -159,12 +159,13 @@
                         Ext.getCmp("btn-delete").setDisabled(count < 1);
                         Ext.getCmp("btn-save").setDisabled(count < 1 || isReject);
                         Ext.getCmp("btn-modify").setDisabled(count != 1 || isReject);
-                        Ext.getCmp("btn-accept").setDisabled(count < 1 || isAccept);
-                        Ext.getCmp("btn-reject").setDisabled(count < 1 || isReject);
+                        //Ext.getCmp("btn-accept").setDisabled(count < 1 || isAccept);
 
-                        Ext.getCmp("btn-staticize").setDisabled(count < 1 || !isAccept);
+
+                        //Ext.getCmp("btn-staticize").setDisabled(count < 1 || !isAccept);
                         Ext.getCmp("btn-preview").setDisabled(count < 1 || isReject);
-
+                        Ext.getCmp("btn-staticize").setDisabled(count < 1);
+                        Ext.getCmp("btn-reject").setDisabled(count < 1 || isReject);
                     }
                 }
             },
@@ -496,6 +497,62 @@
                     '-',
                     {
                         xtype: 'button',
+                        text: '预览',
+                        glyph: 'xf0f6@FontAwesome',
+                        id: 'btn-preview',
+                        disabled: true,
+                        handler: function (self, e) {
+                            var data = [];
+                            Ext.each(gridPanel.getSelection(), function (item, index, allItems) {
+                                data.push(item.data['id']);
+                            });
+                            if (data.length == 0) {
+                                return;
+                            }
+
+                            Ext.Ajax.request({
+                                url: 'article/preview',
+                                method: "POST",
+                                params: {
+                                    data: Ext.JSON.encode(data)
+                                },
+                                success: ajaxSuccess,
+                                failure: ajaxFailure
+                            });
+                        }
+                    },
+                    {
+                        xtype: 'button',
+                        text: '发布',
+                        glyph: 'xf0f6@FontAwesome',
+                        id: 'btn-staticize',
+                        disabled: true,
+                        handler: function (self, e) {
+                            var data = [];
+                            Ext.each(gridPanel.getSelection(), function (item, index, allItems) {
+                                data.push(item.data['id']);
+                            });
+                            if (data.length == 0) {
+                                return;
+                            }
+                            Ext.Msg.confirm("发布确认", "是否发布文章？", function (buttonId, text, opt) {
+                                if (buttonId == 'yes' || buttonId == 'ok') {
+
+                                    Ext.Ajax.request({
+                                        url: 'article/staticize',
+                                        method: "POST",
+                                        params: {
+                                            data: Ext.JSON.encode(data)
+                                        },
+                                        success: ajaxSuccess,
+                                        failure: ajaxFailure
+                                    });
+                                }
+                            }).setIcon(Ext.Msg.WARNING);
+                        }
+                    },
+                    /*{
+                        xtype: 'button',
                         text: '启用',
                         id: 'btn-accept',
                         glyph: 'xf00c@FontAwesome',
@@ -518,33 +575,6 @@
                                 success: ajaxSuccess,
                                 failure: ajaxFailure
                             });
-                        }
-                    },
-                    {
-                        xtype: 'button',
-                        text: '废弃',
-                        id: 'btn-reject',
-                        glyph: 'xf05e@FontAwesome',
-                        disabled: true,
-                        handler: function (self, e) {
-                            var data = [];
-                            Ext.each(gridPanel.getSelection(), function (item, index, allItems) {
-                                data.push(item.data['id']);
-                            });
-                            if (data.length == 0) {
-                                return;
-                            }
-
-                            Ext.Ajax.request({
-                                url: 'article/reject',
-                                method: "POST",
-                                params: {
-                                    data: Ext.JSON.encode(data)
-                                },
-                                success: ajaxSuccess,
-                                failure: ajaxFailure
-                            });
-
                         }
                     },
                     {
@@ -576,12 +606,12 @@
                                 }
                             }).setIcon(Ext.Msg.WARNING);
                         }
-                    },
+                    },*/
                     {
                         xtype: 'button',
-                        text: '预览文章',
-                        glyph: 'xf0f6@FontAwesome',
-                        id: 'btn-preview',
+                        text: '废弃',
+                        id: 'btn-reject',
+                        glyph: 'xf05e@FontAwesome',
                         disabled: true,
                         handler: function (self, e) {
                             var data = [];
@@ -591,16 +621,19 @@
                             if (data.length == 0) {
                                 return;
                             }
-
-                            Ext.Ajax.request({
-                                url: 'article/preview',
-                                method: "POST",
-                                params: {
-                                    data: Ext.JSON.encode(data)
-                                },
-                                success: ajaxSuccess,
-                                failure: ajaxFailure
-                            });
+                            Ext.Msg.confirm("废弃确认", "废弃文章后，网友将无法访问到废弃后的文章，确认废弃吗？", function (buttonId, text, opt) {
+                                if (buttonId == 'yes' || buttonId == 'ok') {
+                                    Ext.Ajax.request({
+                                        url: 'article/reject',
+                                        method: "POST",
+                                        params: {
+                                            data: Ext.JSON.encode(data)
+                                        },
+                                        success: ajaxSuccess,
+                                        failure: ajaxFailure
+                                    });
+                                }
+                            }).setIcon(Ext.Msg.WARNING);
                         }
                     }
                 ]
@@ -777,7 +810,7 @@
                                         'forecolor', 'hilitecolor', 'bold', 'italic', 'underline', 'removeformat', '|',
                                         'justifyleft', 'justifycenter', 'justifyright', 'insertorderedlist', 'insertunorderedlist', '|',
                                         'table', 'emoticons', 'image', 'link', '|',
-                                        'quickformat', 'preview', 'baidumap', 'fullscreen'
+                                        'quickformat',  'pagebreak', 'fullscreen'
                                     ],
                                     allowFileUpload: false,
                                     uploadJson: "media/create",
