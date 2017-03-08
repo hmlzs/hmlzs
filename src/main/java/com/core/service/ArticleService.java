@@ -24,6 +24,8 @@ import java.io.File;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Created by sunpeng
@@ -102,16 +104,17 @@ public class ArticleService extends BaseService {
             for (int j = 0; j < subArticles.size(); j++) {
                 sb.append(subArticles.get(j).getContent());
             }
-
-            article.setContent(sb.toString());
-
+            // 分页标记 -> 分页符 （仅供显示用）
+            Pattern r = Pattern.compile(KEY_WORD2);
+            Matcher m = r.matcher(sb.toString());
+            article.setContent(m.replaceAll(KEY_WORD));
             ObjectNode objectNode = objectMapper.valueToTree(article);
-
             arrayNode.add(objectNode);
         }
 
         resultNode.put("data", arrayNode);
         resultNode.put("success", true);
+        resultNode.put("totalData",page.getTotalData());
 
         return resultNode;
     }
@@ -158,10 +161,53 @@ public class ArticleService extends BaseService {
 
     }
 
+    // 检查P标签是否闭合
+    public static String checkPLable(String str) {
+        StringBuffer stringBuffer = new StringBuffer();
+        boolean isAdd = false;
+        // 检查开头
+        if (str.indexOf("<p>") > str.indexOf("</p>")) {
+            stringBuffer.append("<p>").append(str);
+            str = stringBuffer.toString();
+            isAdd = true;
+        }
+        // 检查结尾
+        if (str.lastIndexOf("<p>") > str.lastIndexOf("</p>")) {
+            if (!isAdd) {
+                stringBuffer.append(str).append("</p>");
+            }  else {
+                stringBuffer.append("</p>");
+            }
+            str = stringBuffer.toString();
+        }
+        stringBuffer.setLength(0);
+        return str;
+    }
+
+    final String KEY_WORD = "<hr style=\"page-break-after:always;\" class=\"ke-pagebreak\" />";
+    final String KEY_WORD2 = "-{30}page\\d{1,}?-{30}";
     public String[] buildContentArray(String content) throws UnsupportedEncodingException {
 
         String targetStr = content;
 
+        // 文章分页功能
+        // 分页符 -> 分页标记
+        int num = 1;
+        while (targetStr.indexOf(KEY_WORD) > 0) {
+            targetStr = targetStr.replaceFirst(KEY_WORD, "------------------------------page" + num + "------------------------------");
+            num++;
+        }
+
+        StringBuffer stringBuffer = new StringBuffer();
+        String[] strs = targetStr.split(KEY_WORD2);
+        for (int i = 0; i < strs.length; i++) {
+            if (i > 0) {
+                stringBuffer.append("------------------------------page" + (i+1) + "------------------------------");
+            }
+            stringBuffer.append(checkPLable(strs[i]));
+        }
+        targetStr = stringBuffer.toString();
+        stringBuffer.setLength(0);
         int size = targetStr.length() / Constant.ARTICLE_CONTENT_LENGTH;
         size = targetStr.length() % Constant.ARTICLE_CONTENT_LENGTH == 0 ? size : size + 1;
 
@@ -293,7 +339,6 @@ public class ArticleService extends BaseService {
                 baseRepository.create(subArticle);
 
             }
-
             log("文章更新(包括内容)", "articleId: " + article.getId());
 
             resultNode.put("result", "success");
@@ -479,35 +524,89 @@ public class ArticleService extends BaseService {
 
                 param.put("categoryId", category.getId());
                 param.put("title", article.getTitle());
-                param.put("content", sb.toString());
                 param.put("publishDate", DateUtil.formatDate(article.getPublishDate(), DateUtil.FORMAT_PATTERN_YYMMDD));
                 param.put("source", article.getSource());
                 param.put("author", article.getAuthor());
+                //param.put("content", sb.toString());
 
                 VelocityEngine engine = toolManager.getVelocityEngine();
 
                 ToolContext context = toolManager.createContext();
 
-                context.put("article", param);
+
                 context.put("winTitle", article.getTitle() + Constant.WINDOW_TITLE_SUFFIX);
                 context.put("depict", article.getDepict());
 
                 context.put(Constant.STATIC_RESOURCE_URL_PREFIX, config.getStaticResourceURLPrefix());
                 context.put(Constant.LIST_PAGE_URL_PREFIX, config.getListDomain());
 
-                PrintWriter pw = new PrintWriter(new File(VelocityUtil.getTargetFile(category.getName(), article.getId() + config.getArticleIdAddend())), Constant.ENCODE_UTF8);
+                String[] strs = sb.toString().split(KEY_WORD2);
 
-                Template template = find(Template.class, article.getTemplateId());
-
-                engine.mergeTemplate(template.getPath(), Constant.ENCODE_UTF8, context, pw);
-
-                pw.close();
-
-                File file = new File(buildPreviewFilePath(article.getId() + config.getArticleIdAddend()));
-                if (file.exists()) {
-                    file.delete();
+                LinkedHashMap<String,String> pageNumContent = new LinkedHashMap<String,String>();
+                ArrayList<String> pageURL = new ArrayList<String>();
+                if (strs.length > 1) {
+                    // 有分页符
+                    StringBuffer stringBuffer = new StringBuffer();
+                    for (int i = 0; i < strs.length; i++) {
+                        // http://www.hmlzs.me:8080/article/news/2017/100029.html
+                        pageURL.add(VelocityUtil.getTargetUrl(config, category.getName(), article.getId() + config.getArticleIdAddend(), i == 0 ? "" : "_" + (i)));
+                        pageNumContent.put(i == 0 ? "" : "_" + (i), strs[i]);
+                        stringBuffer.append(strs[i]);
+                    }
+                    pageURL.add(VelocityUtil.getTargetUrl(config, category.getName(), article.getId() + config.getArticleIdAddend(), "_all"));
+                    pageNumContent.put("_all", stringBuffer.toString());
+                    stringBuffer.setLength(0);
+                } else {
+                    // 无分页符
+                    pageNumContent.put("", sb.toString());
                 }
+                int currentPage = 1;
+                StringBuffer stringBuffer = new StringBuffer();
+                for (Object key : pageNumContent.keySet()) {
+                    param.put("content", pageNumContent.get(key));
 
+                    PrintWriter pw = new PrintWriter(new File(VelocityUtil.getTargetFile(category.getName(), article.getId() + config.getArticleIdAddend(),key+"")), Constant.ENCODE_UTF8);
+
+                    //插入分页按钮
+                    stringBuffer.setLength(0);
+                    if ((pageURL.size() > 1) && (currentPage <= pageURL.size()-1)) {
+                        // 补充上一页
+                        if ((currentPage > 1) && (currentPage <= pageURL.size()-1)) {
+                            stringBuffer.append("<a href=\""+ pageURL.get(currentPage-2) +"\">上一页</a>");
+                        }
+                        for (int i = 0; i < pageURL.size()-1; i++) {
+                            if (currentPage == (i+1)) {
+                                stringBuffer.append("<span class=\"current\">"+currentPage+"</span>");
+                            } else {
+                                stringBuffer.append("<a href=\""+pageURL.get(i)+"\">"+(i+1)+"</a>");
+                            }
+                        }
+                        if (currentPage < pageURL.size()-1) {
+                            // 补充下一页
+                            stringBuffer.append("<a href=\""+ pageURL.get(currentPage) +"\">下一页</a>");
+                        }
+                        // 补充阅读全文
+                        stringBuffer.append("<a href=\""+ pageURL.get(pageURL.size()-1) +"\">在本页浏览全文</a>");
+                        param.put("pageContent", stringBuffer.toString());
+                    } else {
+                        param.put("pageContent", "");
+                    }
+                    context.put("article", param);
+
+                    Template template = find(Template.class, article.getTemplateId());
+
+                    engine.mergeTemplate(template.getPath(), Constant.ENCODE_UTF8, context, pw);
+
+                    pw.close();
+
+                    File file = new File(buildPreviewFilePath(article.getId() + config.getArticleIdAddend()));
+                    if (file.exists()) {
+                        file.delete();
+                    }
+                    currentPage++;
+                }
+                stringBuffer.setLength(0);
+                pageURL.clear();
                 stringBuilder.append(id).append(" ");
 
                 article.setUrl(VelocityUtil.getTargetUrl(config, category.getName(), article.getId() + config.getArticleIdAddend()));
@@ -718,14 +817,21 @@ public class ArticleService extends BaseService {
     }
 
     public void deleteStaticHtml(long articleId) {
-
         Article article = find(Article.class, articleId);
         Category category = find(Category.class, article.getCategoryId());
-        File file = new File(VelocityUtil.getTargetFile(category.getName(), article.getId() + config.getArticleIdAddend()));
-
-        if (file.exists()) {
-            file.delete();
+        // 删除所有文件
+        for (int i = 0; i >= 0; i++) {
+            File file = new File(VelocityUtil.getTargetFile(category.getName(), article.getId() + config.getArticleIdAddend(),i == 0 ? "" : "_" + i));
+            if (file.exists()) {
+                file.delete();
+            } else {
+                break;
+            }
         }
+        // 删除all页面
+        File file = new File(VelocityUtil.getTargetFile(category.getName(), article.getId() + config.getArticleIdAddend(),"_all"));
+        if (file.exists())
+            file.delete();
     }
 
     public String getArticleConetnt(Article article) {

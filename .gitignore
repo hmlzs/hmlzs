@@ -63,3 +63,5 @@ src/main/webapp/WEB-INF/preview/
 
 src/main/webapp/WEB-INF/admin/articleList.jsp
 src/main/webapp/WEB-INF/admin/photoList.jsp
+resin-config.xml
+src/main/resource/system.d - 副本.properties
